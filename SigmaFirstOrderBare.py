@@ -15,6 +15,15 @@ from pygsl import integrate
 from shutil import copyfile
 import InterpolationWrappers
 
+# helper routine for boolean command-line arguments
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 # large \omega behavior of \Delta \Pi(\omega, \vec{q}) = \Pi_B(\omega, \vec{q}) - \Pi_0(\omega, \vec{q})
 # fixed \vec{q}; real and imaginary parts of \Delta \Pi
 def GetDeltaBosonPropagatorAsymptote(X,a,b):
@@ -59,7 +68,7 @@ def GetBareDummyBosonPropagtor(n, alpha, L):
     return alpha*ComputeStructureFactorHexagonalNN(n, L)
 
 # get dressed boson propagator for nearest neighbor interaction
-# V(q)_{1,2} = V(q)_{(0);1,2}/(1-V(q)_{(0);2,1}\Pi_{1,2})
+# V(omega,\vec{q})_{1,2} = V(\vec{q})_{(0);1,2}/(1-V(\vec{q})_{(0);1,2}\Pi_{2,1}(omega,\vec{q}))
 def GetDressedDummyBosonPropagator(n, omega, kappa, alpha, L):
     """n: vector of integers characterizing external momentum"""
     """omega: external frequency OR energy"""
@@ -69,7 +78,7 @@ def GetDressedDummyBosonPropagator(n, omega, kappa, alpha, L):
     assert(len(n)==2)
     assert(len(L)==2)
     bareV = GetBareDummyBosonPropagtor(n,alpha,L)
-    return bareV/(1-np.conj(bareV)*GetPolarizationOperatorMomFrequency(n,omega,kappa,L))
+    return bareV/(1-bareV*np.conj(GetPolarizationOperatorMomFrequency(n,omega,kappa,L)))
 
 # structure factor 
 def ComputeStructureFactorHexagonalNN(n, L):
@@ -133,7 +142,7 @@ def Output1DGrid(filename, gridList, observable, precision=16):
     assert(len(gridList.shape)==1)
 
     checkExistingFile(filename)
-
+    
     mom_format="%."+str(precision)+"e"
     data_format=" %."+str(precision)+"e"
     
@@ -178,15 +187,14 @@ def GetPolarizationOperatorMomFrequency(n, omega, kappa, L):
             nLoop = np.copy([n1,n2])
             nPlusLoop = n+nLoop[:]
             nMinusLoop = n-nLoop[:]
-            A[0] = kappa*ComputeStructureFactorHexagonalNN(nLoop,latticeDims)
-            A[1] = np.conj(A[0])
-            B[0] = ComputeStructureFactorHexagonalNN(nPlusLoop,latticeDims)
-            B[1] = ComputeStructureFactorHexagonalNN(nMinusLoop,latticeDims)
+            A[1] = kappa*ComputeStructureFactorHexagonalNN(nLoop,latticeDims)
+            A[0] = np.conj(A[1])
+            B[0] = kappa*ComputeStructureFactorHexagonalNN(nPlusLoop,latticeDims)
+            B[1] = kappa*np.conj(ComputeStructureFactorHexagonalNN(nMinusLoop,latticeDims))
             for i in range(2):
                 if np.abs(A[i]) > 1.0e-10 and np.abs(B[i]) > 1.0e-10:
                     num = omega**2 + np.abs(A[i])**2 + np.abs(B[i])**2
                     if num > 1.0e-15:
-                        #result += np.exp(1j*np.angle(A[i]))*np.exp(1j*np.angle(B[i]))*(np.abs(A[i])+np.abs(B[i]))/num
                         result += (A[i]/np.abs(A[i]))*(B[i]/np.abs(B[i]))*(np.abs(A[i])+np.abs(B[i]))/num
                     else:
                         print "Encountered division by zero in GetPolarizationOperatorKFrequency()!"
@@ -382,6 +390,7 @@ if __name__ == '__main__':
     parser.add_argument("-ol",'--omega_lambda', type=float, nargs='?', default=10.0, help='cutoff for integration of difference between \delta \Pi and asymptote (units of hopping)')
     parser.add_argument("-nff",'--nbr_freq_fit', type=int, nargs='?', default=100, help='numer of frequencies for fit grids of quantities')
     parser.add_argument("-nfo",'--nbr_freq_output', type=int, nargs='?', default=10, help='numer of frequencies for output of quantities on momentum grid')
+    parser.add_argument("-v",'--verbose', type=str2bool, nargs='?', const=True, default=False, help="verbose output of intermediate results")
 
     args = parser.parse_args()
     L = args.L
@@ -417,7 +426,42 @@ if __name__ == '__main__':
     #parameters, covariance matrices, and errors for fits: real and imaginary parts for each (n1,n2)
     fit_params = np.zeros((L,L,2),dtype=float) 
     fit_cov = np.zeros((L,L,2,2),dtype=float) # can't estimate without error
+
+    if args.verbose:
         
+        for i in range(nbrMomenta):
+            sigmaBare = GetSelfEnergyBareDummyMom(externMomenta[i,:],kappa,latticeDims)
+            SigmaBareMom[i,0] = sigmaBare.real
+            SigmaBareMom[i,1] = sigmaBare.imag
+        OutputMomGrid("SigmaBare_alpha_%g_kappa_%g_L_%d_nbrP_%d"%(alpha,kappa,L,nbrMomenta),externMomenta,SigmaBareMom)
+        
+        # print out result for dispersion relation
+        for i in range(nbrMomenta):
+            energy[i] = np.abs(-kappa*np.conj(ComputeStructureFactorHexagonalNN(externMomenta[i,:],latticeDims))+GetSelfEnergyBareDummyMom(externMomenta[i,:],kappa,latticeDims))
+            propagator = GetBareDummyBosonPropagtor(externMomenta[i,:],alpha,latticeDims)
+            barePropagator[i,0] = propagator.real
+            barePropagator[i,1] = propagator.imag
+        OutputMomGrid("BareFirstOrderDispersion_alpha_%g_kappa_%g_L_%d_nbrP_%d"%(alpha,kappa,L,nbrMomenta),externMomenta,energy)
+        OutputMomGrid("BareDummyBosonPropagator_alpha_%g_L_%d_nbrP_%d"%(alpha,L,nbrMomenta),externMomenta,barePropagator)
+    
+        # output dressed propagator on momentum grid for several values of the frequency
+        for i in range(nbrFreqOutput):
+            for j in range(nbrMomenta):
+                propagator = GetDressedDummyBosonPropagator(externMomenta[j,:],omegaOutput[i],kappa,alpha,latticeDims)
+                dressedPropagator[j,0] = propagator.real
+                dressedPropagator[j,1] = propagator.imag
+            OutputMomGrid("DressedDummyBosonPropagator_alpha_%g_omega_%g_L_%d_nbrP_%d"%(alpha,omegaOutput[i],L,nbrMomenta),externMomenta,dressedPropagator)
+
+        # for fixed \vec{q}, output \Pi_RPA(q_0, \vec{q})
+        for i in range(nbrMomenta):
+            for j in range(nbrFreqOutput):
+                propagator = GetDressedDummyBosonPropagator(externMomenta[i,:],omegaOutput[j],kappa,alpha,latticeDims)
+                dressedPropagatorOmega[j,0] = propagator.real
+                dressedPropagatorOmega[j,1] = propagator.imag
+            Output1DGrid("DressedDummyBosonPropagatorOmega_alpha_%g_P_%d_%d_L_%d_nbrP_%d"%(alpha,externMomenta[i,0],externMomenta[i,1],L,nbrMomenta),
+                         omegaOutput,dressedPropagatorOmega)
+
+
     for n1 in range(L):
         for n2 in range(L):
             nExtern = np.copy([n1,n2])
@@ -429,19 +473,16 @@ if __name__ == '__main__':
             fit_params[n1,n2,:], fit_cov[n1,n2,:,:] = curve_fit(GetDeltaBosonPropagatorAsymptote,omegaFit,differencePropagatorFitDataOmega[:,2],
                                                                 method='trf',bounds=((-np.inf,0),(np.inf,np.inf))) # fit absolute value
             assert(fit_params[n1,n2,1]>0.) # make sure w^2 is positive!
-            #for j in range(nbrFreqFit):
-                #differencePropagatorFitDataOmega[j,3] = GetDeltaBosonPropagatorAsymptote(omegaFit[j],fit_params[n1,n2,0],fit_params[n1,n2,1])
+            if args.verbose:
+                for j in range(nbrFreqFit):
+                    differencePropagatorFitDataOmega[j,3] = GetDeltaBosonPropagatorAsymptote(omegaFit[j],fit_params[n1,n2,0],fit_params[n1,n2,1])
                 
-            #Output1DGrid("FitDifferenceDummyBosonPropagatorOmega_kappa_%g_alpha_%g_Q_%d_%d_L_%d_nbrOmega_%d"%(kappa,alpha,nExtern[0],nExtern[1],L,nbrFreqOutput),
-                         #omegaFit,differencePropagatorFitDataOmega)
-    print 'w:',np.sqrt(fit_params[:,:,1])
+                Output1DGrid("FitDifferenceDummyBosonPropagatorOmega_kappa_%g_alpha_%g_Q_%d_%d_L_%d_nbrOmega_%d"%(kappa,alpha,nExtern[0],nExtern[1],L,nbrFreqOutput),
+                             omegaFit,differencePropagatorFitDataOmega)
 
-    for i in range(nbrMomenta):
-        sigmaBare = GetSelfEnergyBareDummyMom(externMomenta[i,:],kappa,latticeDims)
-        SigmaBareMom[i,0] = sigmaBare.real
-        SigmaBareMom[i,1] = sigmaBare.imag
-    OutputMomGrid("SigmaBare_alpha_%g_kappa_%g_L_%d_nbrP_%d"%(alpha,kappa,L,nbrMomenta),externMomenta,SigmaBareMom)
-    
+    if args.verbose:
+        print 'w:',np.sqrt(fit_params[:,:,1])
+
     for i in range(nbrFreqOutput):
         for j in range(nbrMomenta):
             sigmaRPA = GetSelfEnergyRPADummyMomFrequency(externMomenta[j,:],omegaOutput[i],kappa,latticeDims,np.sqrt(fit_params[:,:,1]))
@@ -449,33 +490,6 @@ if __name__ == '__main__':
             SigmaRPAMomFrequency[j,i,1] = sigmaRPA.imag
             print 'nExtern:',externMomenta[j,:],'omega:',omegaOutput[i],'SigmaRPA:',sigmaRPA
         OutputMomGrid("SigmaRPA_alpha_%g_kappa_%g_omega_%g_L_%d_nbrP_%d"%(alpha,kappa,omegaOutput[i],L,nbrMomenta),externMomenta,SigmaRPAMomFrequency[:,i,:])
-    sys.exit()
-
+    
     # TODO: search using Newton-Raphson method
     # search for roots of: E^2 - |-\kappa f^*(p) - \Sigam_{(RPA}_{2,1}(iE, \vec{p})|^2 = 0, fixed \vec{p}
-        
-    # print out result for dispersion relation
-    for i in range(nbrMomenta):
-        energy[i] = np.abs(-kappa*np.conj(ComputeStructureFactorHexagonalNN(externMomenta[i,:],latticeDims))+GetSelfEnergyBareDummyMom(externMomenta[i,:],kappa,latticeDims))
-        propagator = GetBareDummyBosonPropagtor(externMomenta[i,:],alpha,latticeDims)
-        barePropagator[i,0] = propagator.real
-        barePropagator[i,1] = propagator.imag
-    OutputMomGrid("BareFirstOrderDispersion_alpha_%g_kappa_%g_L_%d_nbrP_%d"%(alpha,kappa,L,nbrMomenta),externMomenta,energy)
-    OutputMomGrid("BareDummyBosonPropagator_alpha_%g_L_%d_nbrP_%d"%(alpha,L,nbrMomenta),externMomenta,barePropagator)
-    
-    # output dressed propagator on momentum grid for several values of the frequency
-    for i in range(nbrFreqOutput):
-        for j in range(nbrMomenta):
-            propagator = GetDressedDummyBosonPropagator(externMomenta[j,:],omegaOutput[i],kappa,alpha,latticeDims)
-            dressedPropagator[j,0] = propagator.real
-            dressedPropagator[j,1] = propagator.imag
-        OutputMomGrid("DressedDummyBosonPropagator_alpha_%g_omega_%g_L_%d_nbrP_%d"%(alpha,omegaOutput[i],L,nbrMomenta),externMomenta,dressedPropagator)
-
-    # for fixed \vec{q}, output \Pi_RPA(q_0, \vec{q})
-    for i in range(nbrMomenta):
-        for j in range(nbrFreqOutput):
-            propagator = GetDressedDummyBosonPropagator(externMomenta[i,:],omegaOutput[j],kappa,alpha,latticeDims)
-            dressedPropagatorOmega[j,0] = propagator.real
-            dressedPropagatorOmega[j,1] = propagator.imag
-        Output1DGrid("DressedDummyBosonPropagatorOmega_alpha_%g_P_%d_%d_L_%d_nbrP_%d"%(alpha,externMomenta[i,0],externMomenta[i,1],L,nbrMomenta),
-                     omegaOutput,dressedPropagatorOmega)
