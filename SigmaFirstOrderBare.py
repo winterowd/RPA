@@ -109,8 +109,8 @@ def GetMomentaList(filename):
             if line: # Make sure there's at least one entry.
                 vals=map(int,line)
                 assert(len(vals)==2)
-                assert(-L/2<=vals[0]<L/2)
-                assert(-L/2<=vals[1]<L/2)
+                #assert(-L/2<=vals[0]<L/2)
+                #assert(-L/2<=vals[1]<L/2)
                 tempList.append((vals[0],vals[1]))
             else:
                 print "Line", count, "is empty!"
@@ -269,6 +269,7 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
                     realIntegrand1 = lambda r: numReal(r)/denom(r)
                     numImag = lambda r: GetSigmaRPAIntegrandWeight(r,w)*((np.abs(factorPlusLoop)**2-omega**2+w*np.tan(r*w))*GetDifferenceDummyBosonPropagator(nLoop,w*np.tan(r*w),kappa,alpha,L).imag
                                                                          - 2*omega*w*np.tan(r*w)*GetDifferenceDummyBosonPropagator(nLoop,w*np.tan(r*w),kappa,alpha,L).real)
+                    imagIntegrand1 = lambda r: numImag(r)/denom(r)
                 else:
                     # \delta \Pi_{1,2}(q_0, \vec{q}) G_{(0);2,1}(p_0+q_0,\vec{p}+\vec{q})
                     realIntegrand1 = lambda r: GetSigmaRPAIntegrandWeight(r,w)*GetDifferenceDummyBosonPropagator(nLoop,w*np.tan(r*w),kappa,alpha,L).real/((omega+w*np.tan(r*w))**2 + (kappa*np.abs(factorPlusLoop))**2)
@@ -293,8 +294,12 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
 
                 if verbose:
                     for i in range(nbrRTest):
-                        integrandData[i,0] = realIntegrand1Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
-                        integrandData[i,1] = imagIntegrand1Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
+                        if useInterpolator:
+                            integrandData[i,0] = realIntegrand1Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
+                            integrandData[i,1] = imagIntegrand1Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
+                        else:
+                            integrandData[i,0] = realIntegrand1(rIntegrandTest[i])
+                            integrandData[i,1] = imagIntegrand1(rIntegrandTest[i])
 
                     Output1DGrid("Integrand1_kappa_%g_alpha_%g_P_%d_%d_Q_%d_%d_omega_%g_L_%d_nbrR_%d"%(kappa,alpha,n[0],n[1],nLoop[0],nLoop[1],omega,L[0],nbrRTest),
                                  rIntegrandTest,integrandData)
@@ -307,9 +312,10 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
                     numReal = lambda r: GetSigmaRPAIntegrandWeight(r,w)*((np.abs(factorMinusLoop)**2-omega**2+w*np.tan(r*w))*GetDifferenceDummyBosonPropagator(nLoop,w*np.tan(r*w),kappa,alpha,L).real
                                                                          - 2*omega*w*np.tan(r*w)*GetDifferenceDummyBosonPropagator(nLoop,w*np.tan(r*w),kappa,alpha,L).imag)
                     denom = lambda r: ((1j*omega-w*np.tan(r*w))**2+np.abs(factorMinusLoop)**2)*((-1j*omega+w*np.tan(r*w))**2-np.abs(factorMinusLoop)**2)
-                    realIntegrand1 = lambda r: numReal(r)/denom(r)
+                    realIntegrand2 = lambda r: numReal(r)/denom(r)
                     numImag = lambda r: GetSigmaRPAIntegrandWeight(r,w)*((np.abs(factorMinusLoop)**2-omega**2+w*np.tan(r*w))*GetDifferenceDummyBosonPropagator(nLoop,w*np.tan(r*w),kappa,alpha,L).imag
                                                                          + 2*omega*w*np.tan(r*w)*GetDifferenceDummyBosonPropagator(nLoop,w*np.tan(r*w),kappa,alpha,L).real)
+                    imagIntegrand2 = lambda r: numImag(r)/denom(r)
                 else:
                     # \delta \Pi_{2,1}(q_0, \vec{q}) G_{(0);2,1}(p_0-q_0,\vec{p}+\vec{q})
                     realIntegrand2 = lambda r: GetSigmaRPAIntegrandWeight(r,w)*GetDifferenceDummyBosonPropagator(nLoop,w*np.tan(r*w),kappa,alpha,L).real/((omega-w*np.tan(r*w))**2 + (kappa*np.abs(factorMinusLoop))**2)
@@ -334,8 +340,12 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
 
                 if verbose:
                     for i in range(nbrRTest):
-                        integrandData[i,0] = realIntegrand2Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
-                        integrandData[i,1] = imagIntegrand2Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
+                        if useInterpolator:
+                            integrandData[i,0] = realIntegrand2Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
+                            integrandData[i,1] = imagIntegrand2Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
+                        else:
+                            integrandData[i,2] = realIntegrand2(rIntegrandTest[i])
+                            integrandData[i,3] = imagIntegrand2(rIntegrandTest[i])
 
                     Output1DGrid("Integrand2_kappa_%g_alpha_%g_P_%d_%d_Q_%d_%d_omega_%g_L_%d_nbrR_%d"%(kappa,alpha,n[0],n[1],nLoop[0],nLoop[1],omega,L[0],nbrRTest),
                                  rIntegrandTest,integrandData)
@@ -390,7 +400,9 @@ if __name__ == '__main__':
     parser.add_argument("-ol",'--omega_lambda', type=float, nargs='?', default=10.0, help='cutoff for integration of difference between \delta \Pi and asymptote (units of hopping)')
     parser.add_argument("-nff",'--nbr_freq_fit', type=int, nargs='?', default=100, help='numer of frequencies for fit grids of quantities')
     parser.add_argument("-nfo",'--nbr_freq_output', type=int, nargs='?', default=10, help='numer of frequencies for output of quantities on momentum grid')
+    parser.add_argument("-i",'--use_interpolator', type=str2bool, nargs='?', const=True, default=False, help="use interpolator for frequency integral in RPA self-energy")
     parser.add_argument("-v",'--verbose', type=str2bool, nargs='?', const=True, default=False, help="verbose output of intermediate results")
+    parser.add_argument("-vv",'--very_verbose', type=str2bool, nargs='?', const=True, default=False, help="extra verbose output of intermediate results")
 
     args = parser.parse_args()
     L = args.L
@@ -485,7 +497,7 @@ if __name__ == '__main__':
 
     for i in range(nbrFreqOutput):
         for j in range(nbrMomenta):
-            sigmaRPA = GetSelfEnergyRPADummyMomFrequency(externMomenta[j,:],omegaOutput[i],kappa,latticeDims,np.sqrt(fit_params[:,:,1]))
+            sigmaRPA = GetSelfEnergyRPADummyMomFrequency(externMomenta[j,:],omegaOutput[i],kappa,latticeDims,np.sqrt(fit_params[:,:,1]),useInterpolator=args.use_interpolator,verbose=args.very_verbose)
             SigmaRPAMomFrequency[j,i,0] = sigmaRPA.real
             SigmaRPAMomFrequency[j,i,1] = sigmaRPA.imag
             print 'nExtern:',externMomenta[j,:],'omega:',omegaOutput[i],'SigmaRPA:',sigmaRPA
