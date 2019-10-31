@@ -305,6 +305,14 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
                                  rIntegrandTest,integrandData)
                 
                 result += -kappa*np.conj(factorPlusLoop)*(resultIntegration[n1,n2,0]+1j*resultIntegration[n1,n2,1])
+
+                if verbose:
+                    print "HI"
+                    if useInterpolator:
+                        print "DEBUG_RPA_INTERPOLATOR_1 P: %d %d Q: %d %d Omega: %e result: %e %e"%(n[0],n[1],nLoop[0],nLoop[1],omega,resultIntegration[n1,n2,0],resultIntegration[n1,n2,1])
+                    else:
+                        print "DEBUG_RPA_EXACT_1 P: %d %d Q: %d %d Omega: %e result: %e %e"%(n[0],n[1],nLoop[0],nLoop[1],omega,resultIntegration[n1,n2,0],resultIntegration[n1,n2,1])
+                        #sys.exit()
                 
             if np.abs(factorMinusLoop) > 1.0e-10:
 
@@ -352,9 +360,13 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
 
                 result += -kappa*np.conj(factorMinusLoop)*(resultIntegration[n1,n2,2]+1j*resultIntegration[n1,n2,3])
 
-    if verbose:
-        print 'resultIntegration:', resultIntegration
-        
+                if verbose:
+                    print "HI2"
+                    if useInterpolator:
+                        print "DEBUG_RPA_INTERPOLATOR_2 P: %d %d Q: %d %d Omega: %e result: %e %e"%(n[0],n[1],nLoop[0],nLoop[1],omega,resultIntegration[n1,n2,2],resultIntegration[n1,n2,3])
+                    else:
+                        print "DEBUG_RPA_EXACT_2 P: %d %d Q: %d %d Omega: %e result: %e %e"%(n[0],n[1],nLoop[0],nLoop[1],omega,resultIntegration[n1,n2,2],resultIntegration[n1,n2,3])
+                        
     return prefactor*result+bareSigma
 
 def MakeIntFunction(f):
@@ -400,7 +412,7 @@ if __name__ == '__main__':
     parser.add_argument("-ol",'--omega_lambda', type=float, nargs='?', default=10.0, help='cutoff for integration of difference between \delta \Pi and asymptote (units of hopping)')
     parser.add_argument("-nff",'--nbr_freq_fit', type=int, nargs='?', default=100, help='numer of frequencies for fit grids of quantities')
     parser.add_argument("-nfo",'--nbr_freq_output', type=int, nargs='?', default=10, help='numer of frequencies for output of quantities on momentum grid')
-    parser.add_argument("-i",'--use_interpolator', type=str2bool, nargs='?', const=True, default=False, help="use interpolator for frequency integral in RPA self-energy")
+    parser.add_argument("-ui",'--use_interpolator', type=str2bool, nargs='?', const=True, default=False, help="use interpolator for frequency integral in RPA self-energy")
     parser.add_argument("-v",'--verbose', type=str2bool, nargs='?', const=True, default=False, help="verbose output of intermediate results")
     parser.add_argument("-vv",'--very_verbose', type=str2bool, nargs='?', const=True, default=False, help="extra verbose output of intermediate results")
 
@@ -495,8 +507,8 @@ if __name__ == '__main__':
     if args.verbose:
         print 'w:',np.sqrt(fit_params[:,:,1])
 
-    for i in range(nbrFreqOutput):
-        for j in range(nbrMomenta):
+    for i in range(1):
+        for j in range(1):
             sigmaRPA = GetSelfEnergyRPADummyMomFrequency(externMomenta[j,:],omegaOutput[i],kappa,latticeDims,np.sqrt(fit_params[:,:,1]),useInterpolator=args.use_interpolator,verbose=args.very_verbose)
             SigmaRPAMomFrequency[j,i,0] = sigmaRPA.real
             SigmaRPAMomFrequency[j,i,1] = sigmaRPA.imag
