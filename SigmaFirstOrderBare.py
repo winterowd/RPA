@@ -97,10 +97,10 @@ def ComputeStructureFactorHexagonalNN(n, L):
 def GetMomentaList(filename):
     tempList = []
     separator=' '
-    if (not os.path.isfile(inputfileMomentum)):
-        print "Error: File", inputfileMomentum, " does not exist"
+    if (not os.path.isfile(filename)):
+        print "Error: File", filename, " does not exist"
         sys.exit()
-    with file(inputfileMomentum, 'rb') as file_obj:
+    with file(filename, 'rb') as file_obj:
         count=0
         for line in csv.reader(file_obj,
                 delimiter=separator,    # Your custom delimiter.
@@ -209,7 +209,7 @@ def GetSigmaRPAIntegrandWeight(r,w):
 
 # inplements RPA self-energy at first order \Sigma_{RPA;(2,1)}
 # uses dressed dummy boson propagator and bare fermion propagator
-def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRTraining=40, nbrRTest=200, workspaceSize=100, maxBisections=100, epsilonQuad=1.0e-07,
+def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRTraining=40, orderInterpolate=3, nbrRTest=200, workspaceSize=100, maxBisections=100, epsilonQuad=1.0e-07,
                                       epsilonRelQuad=1.0e-04, useInterpolator=True, verbose=False, findEnergy=False):
     """n: vector of integers characterizing external momentum"""
     """omega: external frequency OR energy"""
@@ -254,11 +254,11 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
 
             if useInterpolator:
                 rIntegrandTrain = np.linspace(-rMax,rMax,num=nbrRTraining,endpoint=True)
-                integrandTrain = np.zeros((nbrRTraining,4))
+                integrandTrain = np.zeros((nbrRTraining,2))
             
             if verbose:
                 rIntegrandTest = np.linspace(-rMax,rMax,num=nbrRTest,endpoint=True)
-                integrandData = np.zeros((nbrRTest,4))
+                integrandData = np.zeros((nbrRTest,2))
                         
             if np.abs(factorPlusLoop) > 1.0e-10:
 
@@ -280,8 +280,8 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
                         integrandTrain[i,0] = realIntegrand1(rIntegrandTrain[i])
                         integrandTrain[i,1] = imagIntegrand1(rIntegrandTrain[i])
                 
-                    realIntegrand1Interp = InterpolationWrappers.MyUnivariateSpline(x=rIntegrandTrain,y=integrandTrain[:,0],name="realIntegrand1",boundsError=True,verbose=True)
-                    imagIntegrand1Interp = InterpolationWrappers.MyUnivariateSpline(x=rIntegrandTrain,y=integrandTrain[:,1],name="imagIntegrand1",boundsError=True,verbose=True)
+                    realIntegrand1Interp = InterpolationWrappers.MyUnivariateSpline(x=rIntegrandTrain,y=integrandTrain[:,0],name="realIntegrand1",order=orderInterpolate,boundsError=True,verbose=True)
+                    imagIntegrand1Interp = InterpolationWrappers.MyUnivariateSpline(x=rIntegrandTrain,y=integrandTrain[:,1],name="imagIntegrand1",order=orderInterpolate,boundsError=True,verbose=True)
 
                     realIntFuc = integrate.gsl_function(MakeIntFunction(realIntegrand1Interp.EvaluateUnivariateInterpolationPoint), None) #set function to be integrated (real)
                     imagIntFuc = integrate.gsl_function(MakeIntFunction(imagIntegrand1Interp.EvaluateUnivariateInterpolationPoint), None) #set function to be integrated (imag)
@@ -306,14 +306,16 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
                 
                 result += -kappa*np.conj(factorPlusLoop)*(resultIntegration[n1,n2,0]+1j*resultIntegration[n1,n2,1])
 
+                filename = "RPA_INTEGRAL1_P_%d_%d_Q_%d_%d_omega_%e"%(n[0],n[1],nLoop[0],nLoop[1],omega)
+                checkExistingFile(filename)
                 if verbose:
-                    print "HI"
-                    if useInterpolator:
-                        print "DEBUG_RPA_INTERPOLATOR_1 P: %d %d Q: %d %d Omega: %e result: %e %e"%(n[0],n[1],nLoop[0],nLoop[1],omega,resultIntegration[n1,n2,0],resultIntegration[n1,n2,1])
-                    else:
-                        print "DEBUG_RPA_EXACT_1 P: %d %d Q: %d %d Omega: %e result: %e %e"%(n[0],n[1],nLoop[0],nLoop[1],omega,resultIntegration[n1,n2,0],resultIntegration[n1,n2,1])
-                        #sys.exit()
-                
+                    with open(filename, "w") as text_file:
+                        if useInterpolator:
+                            text_file.write("interpolator_result: %.16e %.16e\n"%(resultIntegration[n1,n2,0],resultIntegration[n1,n2,1]))
+                        else:
+                            text_file.write("exact_result: %.16e %.16e\n"%(resultIntegration[n1,n2,0],resultIntegration[n1,n2,1]))
+                        text_file.close()
+                                                                    
             if np.abs(factorMinusLoop) > 1.0e-10:
 
                 if findEnergy:
@@ -331,11 +333,11 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
 
                 if useInterpolator:
                     for i in range(nbrRTraining):
-                        integrandTrain[i,2] = realIntegrand2(rIntegrandTrain[i])
-                        integrandTrain[i,3] = imagIntegrand2(rIntegrandTrain[i])
+                        integrandTrain[i,0] = realIntegrand2(rIntegrandTrain[i])
+                        integrandTrain[i,1] = imagIntegrand2(rIntegrandTrain[i])
                 
-                    realIntegrand2Interp = InterpolationWrappers.MyUnivariateSpline(x=rIntegrandTrain,y=integrandTrain[:,2],name="realIntegrand2",boundsError=True,verbose=True)
-                    imagIntegrand2Interp = InterpolationWrappers.MyUnivariateSpline(x=rIntegrandTrain,y=integrandTrain[:,3],name="imagIntegrand2",boundsError=True,verbose=True)
+                    realIntegrand2Interp = InterpolationWrappers.MyUnivariateSpline(x=rIntegrandTrain,y=integrandTrain[:,0],name="realIntegrand2",order=orderInterpolate,boundsError=True,verbose=True)
+                    imagIntegrand2Interp = InterpolationWrappers.MyUnivariateSpline(x=rIntegrandTrain,y=integrandTrain[:,1],name="imagIntegrand2",order=orderInterpolate,boundsError=True,verbose=True)
 
                     realIntFuc = integrate.gsl_function(MakeIntFunction(realIntegrand2Interp.EvaluateUnivariateInterpolationPoint), None) #set function to be integrated (real)
                     imagIntFuc = integrate.gsl_function(MakeIntFunction(imagIntegrand2Interp.EvaluateUnivariateInterpolationPoint), None) #set function to be integrated (imag)
@@ -352,20 +354,23 @@ def GetSelfEnergyRPADummyMomFrequency(n, omega, kappa, L, asymptoteParams, nbrRT
                             integrandData[i,0] = realIntegrand2Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
                             integrandData[i,1] = imagIntegrand2Interp.EvaluateUnivariateInterpolationPoint(rIntegrandTest[i])
                         else:
-                            integrandData[i,2] = realIntegrand2(rIntegrandTest[i])
-                            integrandData[i,3] = imagIntegrand2(rIntegrandTest[i])
+                            integrandData[i,0] = realIntegrand2(rIntegrandTest[i])
+                            integrandData[i,1] = imagIntegrand2(rIntegrandTest[i])
 
                     Output1DGrid("Integrand2_kappa_%g_alpha_%g_P_%d_%d_Q_%d_%d_omega_%g_L_%d_nbrR_%d"%(kappa,alpha,n[0],n[1],nLoop[0],nLoop[1],omega,L[0],nbrRTest),
                                  rIntegrandTest,integrandData)
 
                 result += -kappa*np.conj(factorMinusLoop)*(resultIntegration[n1,n2,2]+1j*resultIntegration[n1,n2,3])
 
+                filename = "RPA_INTEGRAL2_P_%d_%d_Q_%d_%d_omega_%e"%(n[0],n[1],nLoop[0],nLoop[1],omega)
+                checkExistingFile(filename)
                 if verbose:
-                    print "HI2"
-                    if useInterpolator:
-                        print "DEBUG_RPA_INTERPOLATOR_2 P: %d %d Q: %d %d Omega: %e result: %e %e"%(n[0],n[1],nLoop[0],nLoop[1],omega,resultIntegration[n1,n2,2],resultIntegration[n1,n2,3])
-                    else:
-                        print "DEBUG_RPA_EXACT_2 P: %d %d Q: %d %d Omega: %e result: %e %e"%(n[0],n[1],nLoop[0],nLoop[1],omega,resultIntegration[n1,n2,2],resultIntegration[n1,n2,3])
+                    with open(filename, "w") as text_file:
+                        if useInterpolator:
+                            text_file.write("interpolator_result: %.16e %.16e\n"%(resultIntegration[n1,n2,2],resultIntegration[n1,n2,3]))
+                        else:
+                            text_file.write("exact_result: %.16e %.16e\n"%(resultIntegration[n1,n2,2],resultIntegration[n1,n2,3]))
+                        text_file.close()
                         
     return prefactor*result+bareSigma
 
@@ -412,6 +417,8 @@ if __name__ == '__main__':
     parser.add_argument("-ol",'--omega_lambda', type=float, nargs='?', default=10.0, help='cutoff for integration of difference between \delta \Pi and asymptote (units of hopping)')
     parser.add_argument("-nff",'--nbr_freq_fit', type=int, nargs='?', default=100, help='numer of frequencies for fit grids of quantities')
     parser.add_argument("-nfo",'--nbr_freq_output', type=int, nargs='?', default=10, help='numer of frequencies for output of quantities on momentum grid')
+    parser.add_argument("-nfi",'--nbr_freq_interpolate', type=int, nargs='?', default=40, help='numer of frequencies for training points used by interpolator in RPA self-energy frequency integral')
+    parser.add_argument("-oi",'--order_interpolate', type=int, nargs='?', default=3, help='order of spline interpolator in RPA self-energy frequency integral')
     parser.add_argument("-ui",'--use_interpolator', type=str2bool, nargs='?', const=True, default=False, help="use interpolator for frequency integral in RPA self-energy")
     parser.add_argument("-v",'--verbose', type=str2bool, nargs='?', const=True, default=False, help="verbose output of intermediate results")
     parser.add_argument("-vv",'--very_verbose', type=str2bool, nargs='?', const=True, default=False, help="extra verbose output of intermediate results")
@@ -507,9 +514,12 @@ if __name__ == '__main__':
     if args.verbose:
         print 'w:',np.sqrt(fit_params[:,:,1])
 
-    for i in range(1):
-        for j in range(1):
-            sigmaRPA = GetSelfEnergyRPADummyMomFrequency(externMomenta[j,:],omegaOutput[i],kappa,latticeDims,np.sqrt(fit_params[:,:,1]),useInterpolator=args.use_interpolator,verbose=args.very_verbose)
+    #for i in range(nbrFreqOutput):
+    for i in range(1,nbrFreqOutput):
+        #for j in range(nbrMomenta):
+        for j in range(1,nbrMomenta):
+            sigmaRPA = GetSelfEnergyRPADummyMomFrequency(externMomenta[j,:],omegaOutput[i],kappa,latticeDims,np.sqrt(fit_params[:,:,1]),nbrRTraining=args.nbr_freq_interpolate, useInterpolator=args.use_interpolator,
+                                                         verbose=args.very_verbose)
             SigmaRPAMomFrequency[j,i,0] = sigmaRPA.real
             SigmaRPAMomFrequency[j,i,1] = sigmaRPA.imag
             print 'nExtern:',externMomenta[j,:],'omega:',omegaOutput[i],'SigmaRPA:',sigmaRPA
